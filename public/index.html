@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Five in Row — Online</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --surface2: #1a1a26;
+  --border: #2a2a3e;
+  --p1: #e8ff5a;
+  --p1-glow: rgba(232,255,90,0.35);
+  --p2: #ff5a8e;
+  --p2-glow: rgba(255,90,142,0.35);
+  --text: #f0f0ff;
+  --muted: #6060a0;
+  --accent: #5af0ff;
+  --green: #5affc8;
+  --red: #ff5a5a;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
+}
+body::before {
+  content:''; position:fixed; top:-200px; left:-200px;
+  width:600px; height:600px;
+  background: radial-gradient(circle, rgba(232,255,90,0.035) 0%, transparent 70%);
+  pointer-events:none; animation: d1 14s ease-in-out infinite alternate;
+}
+body::after {
+  content:''; position:fixed; bottom:-200px; right:-200px;
+  width:600px; height:600px;
+  background: radial-gradient(circle, rgba(255,90,142,0.035) 0%, transparent 70%);
+  pointer-events:none; animation: d2 17s ease-in-out infinite alternate;
+}
+@keyframes d1 { to { transform: translate(80px,60px); } }
+@keyframes d2 { to { transform: translate(-60px,-80px); } }
+
+/* ───── LOBBY ───── */
+#lobby {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; min-height: 100vh;
+  padding: 24px; width: 100%; max-width: 460px;
+  gap: 0;
+}
+.logo-big {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 3.4rem; letter-spacing: 0.14em;
+  margin-bottom: 6px; text-align: center;
+}
+.logo-big span { color: var(--p1); }
+.tagline { color: var(--muted); font-size: 0.82rem; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 40px; }
+
+.lobby-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px; padding: 32px;
+  width: 100%; margin-bottom: 16px;
+}
+.lobby-card h3 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.1rem; letter-spacing: 0.12em;
+  margin-bottom: 20px; color: var(--muted);
+}
+.field-label { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+input[type=text] {
+  width: 100%; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text); font-family: 'DM Sans', sans-serif;
+  font-size: 0.95rem; padding: 11px 14px; outline: none;
+  transition: border-color 0.2s; margin-bottom: 14px;
+}
+input[type=text]:focus { border-color: var(--accent); }
+input[type=text]::placeholder { color: var(--muted); }
+
+.size-row { display: flex; gap: 8px; margin-bottom: 18px; }
+.sz {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border);
+  color: var(--muted); font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem; padding: 8px 4px; border-radius: 8px;
+  cursor: pointer; transition: all 0.15s; text-align: center;
+}
+.sz:hover { border-color: var(--accent); color: var(--accent); }
+.sz.active { border-color: var(--accent); color: var(--accent); background: rgba(90,240,255,0.06); }
+
+.btn {
+  border: none; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; font-size: 0.85rem;
+  font-weight: 600; letter-spacing: 0.05em;
+  border-radius: 10px; padding: 12px 20px;
+  transition: all 0.18s; width: 100%;
+}
+.btn-primary { background: var(--p1); color: #0a0a0f; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 24px var(--p1-glow); }
+.btn-secondary { background: var(--p2); color: #0a0a0f; }
+.btn-secondary:hover { transform: translateY(-1px); box-shadow: 0 6px 24px var(--p2-glow); }
+.btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-sm { width: auto; padding: 8px 18px; font-size: 0.78rem; }
+
+.divider {
+  display: flex; align-items: center; gap: 12px;
+  color: var(--muted); font-size: 0.72rem;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  margin: 6px 0;
+}
+.divider::before, .divider::after { content:''; flex:1; height:1px; background: var(--border); }
+
+/* ───── WAITING ───── */
+#waiting {
+  display: none; flex-direction: column; align-items: center;
+  justify-content: center; min-height: 100vh;
+  padding: 24px; text-align: center;
+}
+.code-display {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 4.5rem; letter-spacing: 0.22em;
+  color: var(--p1); margin: 16px 0;
+  text-shadow: 0 0 30px var(--p1-glow);
+}
+.waiting-label { font-size: 0.78rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+.waiting-sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 32px; }
+.pulse-ring {
+  width: 80px; height: 80px; border-radius: 50%;
+  border: 2px solid var(--p1); margin: 24px auto;
+  position: relative; animation: pulse 1.8s ease-in-out infinite;
+}
+.pulse-ring::before {
+  content:''; position:absolute; inset:-12px; border-radius:50%;
+  border: 1px solid rgba(232,255,90,0.3);
+  animation: pulse 1.8s ease-in-out infinite 0.4s;
+}
+@keyframes pulse {
+  0%,100% { transform:scale(1); opacity:1; }
+  50%      { transform:scale(1.15); opacity:0.6; }
+}
+.copy-btn {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--accent); font-family:'DM Sans',sans-serif;
+  font-size: 0.8rem; padding: 8px 16px; border-radius: 8px;
+  cursor: pointer; transition: all 0.15s; margin-bottom: 24px;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.copy-btn:hover { border-color: var(--accent); background: rgba(90,240,255,0.06); }
+
+/* ───── GAME ───── */
+#game { display: none; flex-direction: column; align-items: center; width: 100%; }
+
+header {
+  width: 100%; max-width: 920px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 22px 24px 10px;
+}
+.logo-sm {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.6rem; letter-spacing: 0.12em;
+}
+.logo-sm span { color: var(--p1); }
+.room-badge {
+  font-size: 0.7rem; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 4px 12px; border-radius: 6px; letter-spacing: 0.08em;
+}
+.room-badge b { color: var(--accent); }
+.conn-badge {
+  display:flex; align-items:center; gap:5px;
+  font-size:0.68rem; color:var(--muted); letter-spacing:0.06em;
+}
+.conn-dot { width:7px;height:7px;border-radius:50%; background:var(--green); }
+.conn-dot.off { background:var(--red); }
+
+.scoreboard {
+  display: flex; gap: 12px; padding: 0 24px;
+  width: 100%; max-width: 920px; margin-bottom: 14px;
+}
+.score-card {
+  flex: 1; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 14px 18px;
+  display: flex; align-items: center; gap: 12px;
+  transition: all 0.3s; position: relative; overflow: hidden;
+}
+.score-card.active.p1 { box-shadow: 0 0 0 1.5px var(--p1), 0 0 28px var(--p1-glow); }
+.score-card.active.p2 { box-shadow: 0 0 0 1.5px var(--p2), 0 0 28px var(--p2-glow); }
+.score-card.active::before { content:''; position:absolute; top:0;left:0;right:0; height:2px; }
+.score-card.active.p1::before { background: var(--p1); }
+.score-card.active.p2::before { background: var(--p2); }
+.player-dot { width:34px;height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
+.p1 .player-dot { background: rgba(232,255,90,0.1); }
+.p2 .player-dot { background: rgba(255,90,142,0.1); }
+.score-info { flex:1; }
+.player-name { font-size:0.72rem; color:var(--muted); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:1px; }
+.score-val { font-family:'Bebas Neue',sans-serif; font-size:1.7rem; line-height:1; }
+.p1 .score-val { color: var(--p1); }
+.p2 .score-val { color: var(--p2); }
+.you-badge {
+  font-size:0.6rem; font-weight:600; letter-spacing:0.1em; text-transform:uppercase;
+  padding:2px 7px; border-radius:4px; background:rgba(90,240,255,0.1); color:var(--accent);
+}
+.turn-badge {
+  font-size:0.62rem; font-weight:600; letter-spacing:0.1em; text-transform:uppercase;
+  padding:2px 7px; border-radius:4px;
+}
+.p1 .turn-badge { background:rgba(232,255,90,0.12); color:var(--p1); }
+.p2 .turn-badge { background:rgba(255,90,142,0.12); color:var(--p2); }
+
+/* Board */
+.board-wrap { padding: 0 24px; width:100%; max-width:920px; }
+.board-meta {
+  display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;
+}
+.board-info { font-size:0.72rem; color:var(--muted); letter-spacing:0.06em; }
+.moves-badge {
+  font-size:0.68rem; color:var(--muted); background:var(--surface2);
+  border:1px solid var(--border); padding:4px 10px; border-radius:6px;
+  font-variant-numeric: tabular-nums;
+}
+.board-outer {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius:16px; padding:14px; position:relative; overflow:hidden;
+}
+.board-outer::before {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(var(--border) 1px,transparent 1px),
+              linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:48px 48px; opacity:0.15; pointer-events:none;
+}
+#board { display:grid; gap:3px; width:100%; aspect-ratio:1; position:relative; z-index:1; }
+.cell {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius:7px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:background 0.12s, border-color 0.12s, transform 0.1s; position:relative; overflow:hidden;
+}
+.cell.clickable:hover { background:#22223a; border-color:#3a3a5e; }
+.cell:not(.clickable) { cursor: default; }
+.cell:active.clickable { transform:scale(0.91); }
+.cell .stone {
+  width:72%; height:72%; border-radius:50%;
+  opacity:0; transform:scale(0.3);
+  transition: opacity 0.22s cubic-bezier(.34,1.56,.64,1), transform 0.22s cubic-bezier(.34,1.56,.64,1);
+  pointer-events: none;
+}
+.cell.p1 .stone {
+  background: radial-gradient(circle at 38% 35%, #f5ff9a, var(--p1) 60%, #b8cc00);
+  box-shadow: 0 2px 10px rgba(232,255,90,0.5);
+  opacity:1; transform:scale(1);
+}
+.cell.p2 .stone {
+  background: radial-gradient(circle at 38% 35%, #ffaacc, var(--p2) 60%, #cc0044);
+  box-shadow: 0 2px 10px rgba(255,90,142,0.5);
+  opacity:1; transform:scale(1);
+}
+.cell.win-cell { background:#1e1e2e; border-color:#4a4a6e; }
+.cell.win-cell .stone { animation: winPop 0.55s ease forwards; }
+@keyframes winPop { 0%{transform:scale(1)} 35%{transform:scale(1.3)} 65%{transform:scale(0.95)} 100%{transform:scale(1.12)} }
+
+/* Status bar */
+.status-bar {
+  width:100%; max-width:920px; padding:10px 24px;
+  display:flex; align-items:center; gap:8px;
+}
+.status-dot { width:8px;height:8px;border-radius:50%; }
+.status-dot.blink { animation: blink 1.1s ease-in-out infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
+.status-text { font-size:0.76rem; color:var(--muted); letter-spacing:0.05em; }
+
+/* ───── OVERLAY / MODAL ───── */
+.overlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(10,10,15,0.88); backdrop-filter:blur(10px);
+  z-index:200; align-items:center; justify-content:center;
+}
+.overlay.show { display:flex; }
+.modal {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:24px; padding:44px 48px; text-align:center;
+  max-width:380px; width:90%;
+  animation:popIn 0.38s cubic-bezier(.34,1.56,.64,1);
+  position:relative; overflow:hidden;
+}
+.modal::before { content:''; position:absolute; top:0;left:0;right:0; height:3px; }
+.modal.win-p1::before { background:var(--p1); box-shadow:0 0 20px var(--p1); }
+.modal.win-p2::before { background:var(--p2); box-shadow:0 0 20px var(--p2); }
+.modal.draw::before   { background:linear-gradient(90deg,var(--p1),var(--p2)); }
+@keyframes popIn { from{transform:scale(0.65);opacity:0} to{transform:scale(1);opacity:1} }
+.modal-emoji { font-size:3.2rem; margin-bottom:14px; display:block; }
+.modal-title { font-family:'Bebas Neue',sans-serif; font-size:2.5rem; letter-spacing:0.1em; margin-bottom:6px; }
+.modal.win-p1 .modal-title { color:var(--p1); }
+.modal.win-p2 .modal-title { color:var(--p2); }
+.modal.draw  .modal-title { color:var(--text); }
+.modal-sub { color:var(--muted); font-size:0.88rem; margin-bottom:28px; }
+.modal-btns { display:flex; gap:10px; justify-content:center; }
+
+/* Toast */
+#toast {
+  position:fixed; bottom:28px; left:50%; transform:translateX(-50%) translateY(80px);
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:10px; padding:10px 20px; font-size:0.82rem;
+  color:var(--text); z-index:300; transition:transform 0.3s;
+  white-space:nowrap; pointer-events:none;
+}
+#toast.show { transform:translateX(-50%) translateY(0); }
+
+@media(max-width:600px){
+  .logo-big{font-size:2.4rem}
+  .board-outer{padding:8px}
+  .cell{border-radius:5px}
+  .modal{padding:30px 22px}
+  .code-display{font-size:3rem}
+}
+
+/* Auth/Profile */
+#auth {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:100vh; padding:24px; width:100%; max-width:460px;
+}
+.auth-card, .profile-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:20px;
+  padding:28px; width:100%; margin-bottom:16px;
+}
+.auth-card h3, .profile-card h3 {
+  font-family:'Bebas Neue',sans-serif; font-size:1.2rem; letter-spacing:0.12em;
+  margin-bottom:10px; color:var(--text);
+}
+.auth-sub { color:var(--muted); font-size:0.86rem; line-height:1.5; margin-bottom:20px; }
+.auth-row { display:flex; gap:10px; }
+.auth-row input { margin-bottom:0; }
+.dev-code {
+  display:none; margin-top:12px; padding:10px 12px; border-radius:10px;
+  background:rgba(90,240,255,0.08); border:1px solid rgba(90,240,255,0.18);
+  color:var(--accent); font-size:0.82rem;
+}
+.profile-card { display:none; align-items:center; gap:14px; padding:18px; }
+.avatar {
+  width:46px; height:46px; border-radius:50%; border:2px solid var(--border);
+  background:var(--surface2); object-fit:cover; flex-shrink:0;
+}
+.avatar-lg { width:58px; height:58px; }
+.profile-main { flex:1; min-width:0; }
+.profile-name { font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.profile-email { color:var(--muted); font-size:0.78rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.profile-actions { display:flex; gap:8px; margin-top:10px; }
+.name-edit { display:flex; gap:8px; margin-top:10px; }
+.name-edit input { margin-bottom:0; }
+.player-dot { overflow:hidden; }
+.player-dot img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+.locked-note { color:var(--muted); font-size:0.82rem; text-align:center; margin-top:14px; }
+</style>
+</head>
+<body>
+
+<!-- ═══ AUTH ═══ -->
+<div id="auth">
+  <div class="logo-big">FIVE<span>·</span>IN<span>·</span>ROW</div>
+  <div class="tagline">Online Multiplayer</div>
+
+  <div class="auth-card">
+    <h3>Sign in</h3>
+    <div class="auth-sub">Enter your email and verify the code to create your profile. Your avatar is generated from your email.</div>
+    <div class="field-label">Email</div>
+    <input type="text" id="authEmail" placeholder="you@example.com" inputmode="email" autocomplete="email">
+    <button class="btn btn-primary" onclick="requestCode()">Send verification code</button>
+    <div id="devCode" class="dev-code"></div>
+    <div id="codeArea" style="display:none;margin-top:16px">
+      <div class="field-label">Verification Code</div>
+      <div class="auth-row">
+        <input type="text" id="authCode" placeholder="6-digit code" maxlength="6" inputmode="numeric">
+        <button class="btn btn-secondary" style="width:auto" onclick="verifyCode()">Verify</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LOBBY ═══ -->
+<div id="lobby" style="display:none">
+  <div class="logo-big">FIVE<span>·</span>IN<span>·</span>ROW</div>
+  <div class="tagline">Online Multiplayer</div>
+
+  <div class="profile-card" id="profileCard">
+    <img class="avatar avatar-lg" id="profileAvatar" alt="Profile avatar">
+    <div class="profile-main">
+      <div class="profile-name" id="profileName">—</div>
+      <div class="profile-email" id="profileEmail">—</div>
+      <div class="name-edit">
+        <input type="text" id="displayNameInput" maxlength="18" placeholder="Display name">
+        <button class="btn btn-ghost" style="width:auto" onclick="saveProfile()">Save</button>
+      </div>
+      <div class="profile-actions">
+        <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="lobby-card">
+    <h3>Create a Room</h3>
+    <div class="field-label">Board Size</div>
+    <div class="size-row">
+      <div class="sz" onclick="setSize(10)">10×10</div>
+      <div class="sz active" onclick="setSize(15)">15×15</div>
+      <div class="sz" onclick="setSize(19)">19×19</div>
+    </div>
+    <button class="btn btn-primary" onclick="createRoom()">Create Room</button>
+    <div class="locked-note">Rooms use your verified profile automatically.</div>
+  </div>
+
+  <div class="divider">or</div>
+
+  <div class="lobby-card">
+    <h3>Join a Room</h3>
+    <div class="field-label">Room Code</div>
+    <input type="text" id="joinCode" placeholder="Enter 5-letter code" maxlength="5" style="text-transform:uppercase;letter-spacing:0.15em;font-size:1.1rem;">
+    <button class="btn btn-secondary" onclick="joinRoom()">Join Room</button>
+  </div>
+</div>
+
+<!-- ═══ WAITING ═══ -->
+<div id="waiting">
+  <div class="waiting-label">Room Code</div>
+  <div class="code-display" id="waitCode">—</div>
+  <button class="copy-btn" onclick="copyCode()">📋 Copy Code</button>
+  <div class="pulse-ring"></div>
+  <div class="waiting-sub">Share this code with your opponent.<br>Waiting for them to join…</div>
+  <button class="btn btn-ghost btn-sm" onclick="cancelWait()" style="width:auto">Cancel</button>
+</div>
+
+<!-- ═══ GAME ═══ -->
+<div id="game">
+  <header>
+    <div class="logo-sm">FIVE<span>·</span>ROW</div>
+    <div class="room-badge">Room: <b id="roomCodeBadge">—</b></div>
+    <div class="conn-badge">
+      <div class="conn-dot" id="connDot"></div>
+      <span id="connText">Connected</span>
+    </div>
+  </header>
+
+  <div class="scoreboard">
+    <div class="score-card p1" id="card1">
+      <div class="player-dot"><img id="avatar1" alt="Player 1 avatar"></div>
+      <div class="score-info">
+        <div class="player-name" id="name1">Player 1</div>
+        <div class="score-val" id="score1">0</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        <div class="you-badge" id="youBadge1" style="display:none">YOU</div>
+        <div class="turn-badge" id="turnBadge1">TURN</div>
+      </div>
+    </div>
+    <div class="score-card p2" id="card2">
+      <div class="player-dot"><img id="avatar2" alt="Player 2 avatar"></div>
+      <div class="score-info">
+        <div class="player-name" id="name2">Player 2</div>
+        <div class="score-val" id="score2">0</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        <div class="you-badge" id="youBadge2" style="display:none">YOU</div>
+        <div class="turn-badge" id="turnBadge2" style="display:none">TURN</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <div class="board-meta">
+      <div class="board-info" id="boardInfo">15 × 15</div>
+      <div class="moves-badge">Moves: <span id="moveCount">0</span></div>
+    </div>
+    <div class="board-outer">
+      <div id="board"></div>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-dot blink" id="statusDot" style="background:var(--p1)"></div>
+    <div class="status-text" id="statusText">Waiting…</div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal">
+    <span class="modal-emoji" id="modalEmoji">🏆</span>
+    <div class="modal-title" id="modalTitle">—</div>
+    <div class="modal-sub"  id="modalSub">—</div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">View Board</button>
+      <button class="btn btn-primary btn-sm" onclick="requestRematch()">Rematch</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── State ──
+let ws = null;
+let myPlayerNum = null;
+let currentPlayer = 1;
+let boardData = [];
+let SIZE = 15;
+let gameActive = false;
+let myRoomCode = '';
+let names = ['Player 1', 'Player 2'];
+let avatars = ['', ''];
+let currentUser = null;
+let scores = [0, 0];
+let moveCount = 0;
+
+// ── Auth ──
+const API_BASE = '/5inrow';
+async function api(path, options = {}) {
+  const res = await fetch(API_BASE + path, {
+    ...options,
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+async function loadMe() {
+  try {
+    const data = await api('/api/auth/me');
+    currentUser = data.user;
+    if (currentUser) showLobby(); else showAuth();
+    renderProfile();
+  } catch { showAuth(); }
+}
+async function requestCode() {
+  const email = document.getElementById('authEmail').value.trim();
+  if (!email) return showToast('Enter your email.');
+  try {
+    const data = await api('/api/auth/request-code', { method: 'POST', body: JSON.stringify({ email }) });
+    document.getElementById('codeArea').style.display = 'block';
+    const dev = document.getElementById('devCode');
+    if (data.devCode) {
+      dev.textContent = 'Testing code: ' + data.devCode;
+      dev.style.display = 'block';
+    }
+    showToast('Verification code sent.');
+  } catch (error) { showToast(error.message, 3000); }
+}
+async function verifyCode() {
+  const email = document.getElementById('authEmail').value.trim();
+  const code = document.getElementById('authCode').value.trim();
+  try {
+    const data = await api('/api/auth/verify-code', { method: 'POST', body: JSON.stringify({ email, code }) });
+    currentUser = data.user;
+    renderProfile();
+    showLobby();
+  } catch (error) { showToast(error.message, 3000); }
+}
+async function saveProfile() {
+  const displayName = document.getElementById('displayNameInput').value.trim();
+  try {
+    const data = await api('/api/profile', { method: 'PATCH', body: JSON.stringify({ displayName }) });
+    currentUser = data.user;
+    renderProfile();
+    showToast('Profile saved.');
+  } catch (error) { showToast(error.message, 3000); }
+}
+async function logout() {
+  await api('/api/auth/logout', { method: 'POST', body: '{}' });
+  currentUser = null;
+  if (ws) ws.close();
+  showAuth();
+}
+function renderProfile() {
+  if (!currentUser) return;
+  document.getElementById('profileCard').style.display = 'flex';
+  document.getElementById('profileAvatar').src = currentUser.avatarUrl;
+  document.getElementById('profileName').textContent = currentUser.displayName;
+  document.getElementById('profileEmail').textContent = currentUser.email;
+  document.getElementById('displayNameInput').value = currentUser.displayName;
+}
+
+// ── WebSocket ──
+function connect(onOpen) {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/5inrow-ws`);
+
+  ws.onopen = () => {
+    setConn(true);
+    if (onOpen) onOpen();
+  };
+  ws.onclose = () => {
+    setConn(false);
+    showToast('Connection lost. Please refresh.', 4000);
+  };
+  ws.onerror = () => setConn(false);
+
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    handleMessage(msg);
+  };
+
+  // Keepalive
+  setInterval(() => {
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'PING' }));
+  }, 25000);
+}
+
+function wsSend(type, payload = {}) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type, payload }));
+}
+
+function handleMessage({ type, payload }) {
+  if (type === 'ROOM_CREATED') {
+    myRoomCode = payload.code;
+    myPlayerNum = 1;
+    SIZE = payload.size;
+    showWaiting(payload.code);
+  }
+
+  else if (type === 'ROOM_JOINED') {
+    myRoomCode = payload.code;
+    myPlayerNum = 2;
+    SIZE = payload.size;
+    names = payload.names;
+    avatars = payload.avatars || avatars;
+  }
+
+  else if (type === 'OPPONENT_JOINED') {
+    names[1] = payload.name;
+    names = payload.names || names;
+    avatars = payload.avatars || avatars;
+    showToast(`${payload.name} joined the room!`);
+  }
+
+  else if (type === 'GAME_START') {
+    boardData = payload.board;
+    SIZE = payload.size;
+    currentPlayer = payload.current;
+    names = payload.names;
+    avatars = payload.avatars || avatars;
+    moveCount = 0;
+    gameActive = true;
+    // FIX: sync scores from server on every GAME_START (including rematch)
+    scores = payload.scores || [0, 0];
+    showGame();
+    renderBoard();
+    updateUI();
+  }
+
+  else if (type === 'MOVE_MADE') {
+    // FIX: use server-provided player & current correctly
+    const { r, c, player, current } = payload;
+    boardData[r][c] = player;
+    currentPlayer = current;
+    moveCount = payload.moveCount;
+    document.getElementById('moveCount').textContent = moveCount;
+
+    // Animate the placed stone
+    const idx = r * SIZE + c;
+    const cells = document.getElementById('board').querySelectorAll('.cell');
+    const cell = cells[idx];
+    // Remove any existing player class first (safety)
+    cell.classList.remove('p1', 'p2');
+    cell.classList.add(player === 1 ? 'p1' : 'p2');
+
+    updateUI();
+  }
+
+  else if (type === 'GAME_OVER') {
+    scores = payload.scores;
+    document.getElementById('score1').textContent = scores[0];
+    document.getElementById('score2').textContent = scores[1];
+    if (payload.winCells && payload.winCells.length) markWin(payload.winCells);
+    gameActive = false;
+    // Stop turn highlighting
+    document.getElementById('card1').classList.remove('active');
+    document.getElementById('card2').classList.remove('active');
+    document.getElementById('turnBadge1').style.display = 'none';
+    document.getElementById('turnBadge2').style.display = 'none';
+    updateClickable();
+    setTimeout(() => showModal(payload.winner), 500);
+  }
+
+  else if (type === 'REMATCH_REQUEST') {
+    showToast('Opponent wants a rematch! Click Rematch to accept.');
+  }
+
+  else if (type === 'OPPONENT_LEFT') {
+    gameActive = false;
+    updateClickable();
+    showToast('Opponent disconnected.', 4000);
+    setStatus('Opponent left the game.', null);
+  }
+
+  else if (type === 'ERROR') {
+    showToast(payload.message, 3000);
+  }
+}
+
+// ── Lobby Actions ──
+let selectedSize = 15;
+function setSize(n) {
+  selectedSize = n;
+  document.querySelectorAll('.sz').forEach((el, i) => {
+    el.classList.toggle('active', [10, 15, 19][i] === n);
+  });
+}
+
+function createRoom() {
+  if (!currentUser) { showAuth(); return; }
+  connect(() => wsSend('CREATE_ROOM', { size: selectedSize }));
+}
+
+function joinRoom() {
+  if (!currentUser) { showAuth(); return; }
+  const code = document.getElementById('joinCode').value.trim().toUpperCase();
+  if (!code) { showToast('Enter a room code!'); return; }
+  connect(() => wsSend('JOIN_ROOM', { code }));
+}
+
+function cancelWait() {
+  if (ws) ws.close();
+  showLobby();
+}
+
+// ── Board ──
+function renderBoard() {
+  const el = document.getElementById('board');
+  el.style.gridTemplateColumns = `repeat(${SIZE}, 1fr)`;
+  el.innerHTML = '';
+
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.r = r;
+      cell.dataset.c = c;
+
+      // FIX: always create stone div, then apply class so CSS transition works
+      const stone = document.createElement('div');
+      stone.className = 'stone';
+      cell.appendChild(stone);
+
+      const v = boardData[r][c];
+      if (v === 1) cell.classList.add('p1');
+      if (v === 2) cell.classList.add('p2');
+
+      cell.addEventListener('click', onCellClick);
+      el.appendChild(cell);
+    }
+  }
+  updateClickable();
+}
+
+function updateClickable() {
+  const cells = document.getElementById('board').querySelectorAll('.cell');
+  const myTurn = gameActive && currentPlayer === myPlayerNum;
+
+  cells.forEach(c => {
+    const isEmpty = !c.classList.contains('p1') && !c.classList.contains('p2');
+    if (myTurn && isEmpty) c.classList.add('clickable');
+    else c.classList.remove('clickable');
+  });
+
+  // Hover preview ghost stone
+  let sEl = document.getElementById('hover-sty');
+  if (!sEl) {
+    sEl = document.createElement('style');
+    sEl.id = 'hover-sty';
+    document.head.appendChild(sEl);
+  }
+  sEl.textContent = myTurn
+    ? (myPlayerNum === 1
+      ? '.cell.clickable:hover::after{content:"";position:absolute;width:50%;height:50%;border-radius:50%;background:var(--p1);opacity:0.25;pointer-events:none}'
+      : '.cell.clickable:hover::after{content:"";position:absolute;width:50%;height:50%;border-radius:50%;background:var(--p2);opacity:0.25;pointer-events:none}')
+    : '';
+}
+
+function onCellClick(e) {
+  if (!gameActive) return;
+  if (currentPlayer !== myPlayerNum) return;
+  const r = +e.currentTarget.dataset.r;
+  const c = +e.currentTarget.dataset.c;
+  if (boardData[r][c] !== 0) return;
+  wsSend('MOVE', { r, c });
+}
+
+function markWin(cells) {
+  const cellEls = document.getElementById('board').querySelectorAll('.cell');
+  for (const [r, c] of cells) {
+    cellEls[r * SIZE + c].classList.add('win-cell');
+  }
+}
+
+// ── UI Updates ──
+function updateUI() {
+  const c1 = document.getElementById('card1');
+  const c2 = document.getElementById('card2');
+  c1.classList.toggle('active', currentPlayer === 1);
+  c2.classList.toggle('active', currentPlayer === 2);
+  document.getElementById('turnBadge1').style.display = currentPlayer === 1 ? '' : 'none';
+  document.getElementById('turnBadge2').style.display = currentPlayer === 2 ? '' : 'none';
+  document.getElementById('name1').textContent = names[0];
+  document.getElementById('name2').textContent = names[1];
+  document.getElementById('avatar1').src = avatars[0] || 'https://www.gravatar.com/avatar/?d=identicon&s=160';
+  document.getElementById('avatar2').src = avatars[1] || 'https://www.gravatar.com/avatar/?d=identicon&s=160';
+  document.getElementById('score1').textContent = scores[0];
+  document.getElementById('score2').textContent = scores[1];
+  document.getElementById('statusDot').style.background = currentPlayer === 1 ? 'var(--p1)' : 'var(--p2)';
+
+  const turnName = currentPlayer === myPlayerNum ? 'Your turn' : `${names[currentPlayer - 1]}'s turn`;
+  setStatus(turnName, null);
+  updateClickable();
+  document.getElementById('boardInfo').textContent = `${SIZE} × ${SIZE}`;
+  document.getElementById('moveCount').textContent = moveCount;
+}
+
+function setStatus(msg, color) {
+  document.getElementById('statusText').textContent = msg;
+  if (color) document.getElementById('statusDot').style.background = color;
+}
+
+function setConn(on) {
+  document.getElementById('connDot').className = 'conn-dot' + (on ? '' : ' off');
+  document.getElementById('connText').textContent = on ? 'Connected' : 'Disconnected';
+}
+
+// ── Screen management ──
+function showAuth() {
+  document.getElementById('auth').style.display = 'flex';
+  document.getElementById('lobby').style.display = 'none';
+  document.getElementById('waiting').style.display = 'none';
+  document.getElementById('game').style.display = 'none';
+}
+function showLobby() {
+  document.getElementById('auth').style.display = 'none';
+  document.getElementById('lobby').style.display = 'flex';
+  document.getElementById('waiting').style.display = 'none';
+  document.getElementById('game').style.display = 'none';
+}
+function showWaiting(code) {
+  document.getElementById('auth').style.display = 'none';
+  document.getElementById('lobby').style.display = 'none';
+  document.getElementById('waiting').style.display = 'flex';
+  document.getElementById('game').style.display = 'none';
+  document.getElementById('waitCode').textContent = code;
+}
+function showGame() {
+  document.getElementById('auth').style.display = 'none';
+  document.getElementById('lobby').style.display = 'none';
+  document.getElementById('waiting').style.display = 'none';
+  document.getElementById('game').style.display = 'flex';
+  document.getElementById('roomCodeBadge').textContent = myRoomCode;
+  document.getElementById('youBadge1').style.display = myPlayerNum === 1 ? '' : 'none';
+  document.getElementById('youBadge2').style.display = myPlayerNum === 2 ? '' : 'none';
+  document.getElementById('score1').textContent = scores[0];
+  document.getElementById('score2').textContent = scores[1];
+}
+
+// ── Modal ──
+function showModal(winner) {
+  const overlay = document.getElementById('overlay');
+  const modal   = document.getElementById('modal');
+  const emoji   = document.getElementById('modalEmoji');
+  const title   = document.getElementById('modalTitle');
+  const sub     = document.getElementById('modalSub');
+  modal.className = 'modal';
+  if (winner === 0) {
+    modal.classList.add('draw');
+    emoji.textContent = '🤝';
+    title.textContent = 'DRAW';
+    sub.textContent = 'No more moves remaining.';
+  } else {
+    const isMe = winner === myPlayerNum;
+    modal.classList.add(winner === 1 ? 'win-p1' : 'win-p2');
+    emoji.textContent = isMe ? '🏆' : '😔';
+    title.textContent = isMe ? 'YOU WIN!' : `${names[winner - 1]} WINS`;
+    sub.textContent = isMe ? '5 in a row — well played!' : 'Better luck next time!';
+  }
+  overlay.classList.add('show');
+}
+function closeModal() {
+  document.getElementById('overlay').classList.remove('show');
+}
+function requestRematch() {
+  wsSend('REMATCH');
+  closeModal();
+  showToast('Rematch request sent!');
+}
+
+// ── Utils ──
+function copyCode() {
+  navigator.clipboard.writeText(myRoomCode)
+    .then(() => showToast('Code copied!'))
+    .catch(() => showToast(myRoomCode));
+}
+
+let toastTimer;
+function showToast(msg, dur = 2200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), dur);
+}
+
+// ── Enter key shortcuts ──
+document.getElementById('joinCode').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom(); });
+document.getElementById('authEmail').addEventListener('keydown', e => { if (e.key === 'Enter') requestCode(); });
+document.getElementById('authCode').addEventListener('keydown', e => { if (e.key === 'Enter') verifyCode(); });
+loadMe();
+</script>
+</body>
+</html>
